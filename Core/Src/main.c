@@ -58,18 +58,18 @@ static HAL_StatusTypeDef halState = 0;
 static char auxText[32];
 
 //= communication variables ===============================
-static char rxBuffer[MSG_BUFFER_LENGTH];
-static char rxWorking[MSG_BUFFER_LENGTH];
+volatile static char rxBuffer[MSG_BUFFER_LENGTH];
+volatile static char rxWorking[MSG_BUFFER_LENGTH];
 static char response[MSG_BUFFER_LENGTH];
 static int rxSize = MSG_BUFFER_LENGTH;
 static uint8_t *rxBuff = (uint8_t*) rxBuffer;
 
 //= adc variables =========================================
-static uint16_t adcBuffer[] = { 0, 0, 0, 0 };
-static uint16_t adcCount = sizeof(adcBuffer) / sizeof(adcBuffer[0]);
+volatile static uint16_t adcBuffer[] = { 0, 0, 0, 0 };
+volatile static uint16_t adcCount = sizeof(adcBuffer) / sizeof(adcBuffer[0]);
 
-static int adcReady = 0;
-static int timReady = 0;
+volatile static int adcReady = 0;
+//volatile static int timReady = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -93,42 +93,43 @@ GPIO_PinState btn1State();
 /* USER CODE END 0 */
 
 /**
- * @brief  The application entry point.
- * @retval int
- */
-int main(void) {
-	/* USER CODE BEGIN 1 */
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
+  /* USER CODE BEGIN 1 */
 	asClearBuffer(rxBuffer, sizeof(rxBuffer));
 	asClearBuffer(rxWorking, sizeof(rxWorking));
 	asClearBuffer(response, sizeof(response));
 	asClearBuffer(adcBuffer, sizeof(adcBuffer));
-	/* USER CODE END 1 */
+  /* USER CODE END 1 */
 
-	/* MCU Configuration--------------------------------------------------------*/
+  /* MCU Configuration--------------------------------------------------------*/
 
-	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-	HAL_Init();
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
 
-	/* USER CODE BEGIN Init */
+  /* USER CODE BEGIN Init */
 
-	/* USER CODE END Init */
+  /* USER CODE END Init */
 
-	/* Configure the system clock */
-	SystemClock_Config();
+  /* Configure the system clock */
+  SystemClock_Config();
 
-	/* USER CODE BEGIN SysInit */
+  /* USER CODE BEGIN SysInit */
 
-	/* USER CODE END SysInit */
+  /* USER CODE END SysInit */
 
-	/* Initialize all configured peripherals */
-	MX_GPIO_Init();
-	MX_DMA_Init();
-	MX_USART2_UART_Init();
-	MX_USART1_UART_Init();
-	MX_I2C1_Init();
-	MX_ADC1_Init();
-	MX_TIM15_Init();
-	/* USER CODE BEGIN 2 */
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_DMA_Init();
+  MX_USART2_UART_Init();
+  MX_USART1_UART_Init();
+  MX_I2C1_Init();
+  MX_ADC1_Init();
+  MX_TIM15_Init();
+  /* USER CODE BEGIN 2 */
 
 	asIoPort = &huart2;
 	asDbgPort = &huart1;
@@ -148,30 +149,33 @@ int main(void) {
 //	printf("------------------------------"
 //			"------------------------------" _NL);
 
-	asDebug("ADC will be calibrated." _NL);
+//	asDebug("ADC will be calibrated." _NL);
 
 	while (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
 		; // calibrate AD convertor
 
-	asDebugNL("ADC has been calibrated.");
+	asDebugNL("ADC1 has been calibrated.");
+
+//	halState = HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcBuffer, adcCount);
+	halState = HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcBuffer, adcCount);
+	if (halState != HAL_OK) {
+		asDebugNL("ADC1 Start Failed: %s", asHalStatusToStr(halState));
+		Error_Handler();
+	}
+	__HAL_DMA_DISABLE_IT(&hdma_adc1, DMA_IT_HT); // Avoid DMA half transfer interrupt trigger
+	asDebugNL("ADC1 has been started.");
 
 	halState = HAL_TIM_Base_Start_IT(&htim15);
 	if (halState != HAL_OK) {
 		asDebugNL("TIM15 Star Failed: %s", asHalStatusToStr(halState));
 		Error_Handler();
 	}
+	asDebugNL("TIM15 has been started.");
 
-	halState = HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcBuffer, adcCount);
-	if (halState != HAL_OK) {
-		asDebugNL("ADC1 Star Failed: %s", asHalStatusToStr(halState));
-		Error_Handler();
-	}
-	__HAL_DMA_DISABLE_IT(&hdma_adc1, DMA_IT_HT); // Avoid DMA half transfer interrupt trigger
+  /* USER CODE END 2 */
 
-	/* USER CODE END 2 */
-
-	/* Infinite loop */
-	/* USER CODE BEGIN WHILE */
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
 //	HAL_UARTEx_ReceiveToIdle_DMA(&huart1, rxBuff, rxSize);
 //	__HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
 	while (1) {
@@ -186,7 +190,7 @@ int main(void) {
 		asClearBuffer(response, sizeof(response));
 
 		if (adcReady != 0) {
-			sprintf(response, "Values (%d): ", adcReady);
+			sprintf(response, "Values: ");
 			for (int i = 0; i < adcCount; i++) {
 				sprintf(auxText, "%6d;", adcBuffer[i]);
 				strcat(response, auxText);
@@ -197,69 +201,71 @@ int main(void) {
 
 		btn1State();
 
-		/* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
-		/* USER CODE BEGIN 3 */
+    /* USER CODE BEGIN 3 */
 	}
-	/* USER CODE END 3 */
+  /* USER CODE END 3 */
 }
 
 /**
- * @brief System Clock Configuration
- * @retval None
- */
-void SystemClock_Config(void) {
-	RCC_OscInitTypeDef RCC_OscInitStruct = { 0 };
-	RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-	/** Configure the main internal regulator output voltage
-	 */
-	if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1)
-			!= HAL_OK) {
-		Error_Handler();
-	}
+  /** Configure the main internal regulator output voltage
+  */
+  if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
-	/** Configure LSE Drive Capability
-	 */
-	HAL_PWR_EnableBkUpAccess();
-	__HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
+  /** Configure LSE Drive Capability
+  */
+  HAL_PWR_EnableBkUpAccess();
+  __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
 
-	/** Initializes the RCC Oscillators according to the specified parameters
-	 * in the RCC_OscInitTypeDef structure.
-	 */
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE
-			| RCC_OSCILLATORTYPE_MSI;
-	RCC_OscInitStruct.LSEState = RCC_LSE_ON;
-	RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-	RCC_OscInitStruct.MSICalibrationValue = 0;
-	RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
-	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
-	RCC_OscInitStruct.PLL.PLLM = 1;
-	RCC_OscInitStruct.PLL.PLLN = 20;
-	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
-	RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
-	RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
-	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-		Error_Handler();
-	}
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE|RCC_OSCILLATORTYPE_MSI;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+  RCC_OscInitStruct.MSIState = RCC_MSI_ON;
+  RCC_OscInitStruct.MSICalibrationValue = 0;
+  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
+  RCC_OscInitStruct.PLL.PLLM = 1;
+  RCC_OscInitStruct.PLL.PLLN = 40;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
+  RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
+  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
-	/** Initializes the CPU, AHB and APB buses clocks
-	 */
-	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
-			| RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK) {
-		Error_Handler();
-	}
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
-	/** Enable MSI Auto calibration
-	 */
-	HAL_RCCEx_EnableMSIPLLMode();
+  /** Enable MSI Auto calibration
+  */
+  HAL_RCCEx_EnableMSIPLLMode();
 }
 
 /* USER CODE BEGIN 4 */
@@ -271,10 +277,6 @@ char fromBtToSerial() {
 	}
 	return ch;
 }
-
-//void clearBuffer(void *buffer, int length) {
-//	memset(buffer, '\0', length);
-//}
 
 char* removeFrame(char *msg) {
 	int last = strlen(msg);
@@ -345,15 +347,15 @@ GPIO_PinState btn1State() {
 //= Callbacks function ====================================
 
 /**
-  * @brief  Period elapsed callback in non-blocking mode
-  * @param  htim TIM handle
-  * @retval None
-  */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	if (htim->Instance == htim15.Instance) {
-		timReady = 1;
-	}
-}
+ * @brief  Period elapsed callback in non-blocking mode
+ * @param  htim TIM handle
+ * @retval None
+ */
+//void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+//	if (htim->Instance == htim15.Instance) {
+//		timReady = 1;
+//	}
+//}
 
 /**
  * @brief  Conversion complete callback in non-blocking mode
@@ -362,10 +364,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
  */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 	if (hadc->Instance == hadc1.Instance) {
-		if (timReady != 0) {
-			adcReady = 1;
-			timReady = 0;
-		}
+		adcReady = 1;
 	}
 }
 
@@ -405,16 +404,17 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 /* USER CODE END 4 */
 
 /**
- * @brief  This function is executed in case of error occurrence.
- * @retval None
- */
-void Error_Handler(void) {
-	/* USER CODE BEGIN Error_Handler_Debug */
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
 	/* User can add his own implementation to report the HAL error return state */
 	__disable_irq();
 	while (1) {
 	}
-	/* USER CODE END Error_Handler_Debug */
+  /* USER CODE END Error_Handler_Debug */
 }
 
 #ifdef  USE_FULL_ASSERT

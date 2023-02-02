@@ -58,17 +58,18 @@ static HAL_StatusTypeDef halState = 0;
 static char auxText[32];
 
 //= communication variables ===============================
-static char rxBuffer[MSG_BUFFER_LENGTH];
-static char rxWorking[MSG_BUFFER_LENGTH];
+volatile static char rxBuffer[MSG_BUFFER_LENGTH];
+volatile static char rxWorking[MSG_BUFFER_LENGTH];
 static char response[MSG_BUFFER_LENGTH];
 static int rxSize = MSG_BUFFER_LENGTH;
 static uint8_t *rxBuff = (uint8_t*) rxBuffer;
 
 //= adc variables =========================================
-static uint16_t adcBuffer[] = { 0, 0, 0, 0 };
-static uint16_t adcCount = sizeof(adcBuffer) / sizeof(adcBuffer[0]);
+volatile static uint16_t adcBuffer[] = { 0, 0, 0, 0 };
+volatile static uint16_t adcCount = sizeof(adcBuffer) / sizeof(adcBuffer[0]);
 
-static int adcReady = 0;
+volatile static int adcReady = 0;
+volatile static int timReady = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -155,18 +156,19 @@ int main(void)
 
 	asDebugNL("ADC has been calibrated.");
 
-	halState = HAL_TIM_Base_Start_IT(&htim15);
-	if (halState != HAL_OK) {
-		asDebugNL("TIM15 Star Failed: %s", asHalStatusToStr(halState));
-		Error_Handler();
-	}
-
+//	halState = HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcBuffer, adcCount);
 	halState = HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcBuffer, adcCount);
 	if (halState != HAL_OK) {
 		asDebugNL("ADC1 Star Failed: %s", asHalStatusToStr(halState));
 		Error_Handler();
 	}
 	__HAL_DMA_DISABLE_IT(&hdma_adc1, DMA_IT_HT); // Avoid DMA half transfer interrupt trigger
+
+	halState = HAL_TIM_Base_Start_IT(&htim15);
+	if (halState != HAL_OK) {
+		asDebugNL("TIM15 Star Failed: %s", asHalStatusToStr(halState));
+		Error_Handler();
+	}
 
   /* USER CODE END 2 */
 
@@ -186,7 +188,6 @@ int main(void)
 		asClearBuffer(response, sizeof(response));
 
 		if (adcReady != 0) {
-			HAL_Delay(50);
 			sprintf(response, "Values (%d): ", adcReady);
 			for (int i = 0; i < adcCount; i++) {
 				sprintf(auxText, "%6d;", adcBuffer[i]);
@@ -237,7 +238,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
   RCC_OscInitStruct.PLL.PLLM = 1;
-  RCC_OscInitStruct.PLL.PLLN = 20;
+  RCC_OscInitStruct.PLL.PLLN = 40;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV7;
   RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
   RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
@@ -255,7 +256,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
   {
     Error_Handler();
   }
@@ -346,6 +347,18 @@ GPIO_PinState btn1State() {
 }
 
 //= Callbacks function ====================================
+
+/**
+ * @brief  Period elapsed callback in non-blocking mode
+ * @param  htim TIM handle
+ * @retval None
+ */
+//void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+//	if (htim->Instance == htim15.Instance) {
+//		timReady = 1;
+//	}
+//}
+
 /**
  * @brief  Conversion complete callback in non-blocking mode
  * @param  hadc: ADC handle
@@ -353,7 +366,11 @@ GPIO_PinState btn1State() {
  */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 	if (hadc->Instance == hadc1.Instance) {
+//		if (timReady != 0) {
+//		adcBuffer[0] = HAL_ADC_GetValue(&hadc1);
 		adcReady = 1;
+//			timReady = 0;
+//		}
 	}
 }
 
