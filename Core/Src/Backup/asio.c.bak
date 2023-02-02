@@ -1,0 +1,83 @@
+/*
+ * asio.c
+ *
+ *  Created on: 18. 1. 2023
+ *      Author: tonda
+ */
+
+#include "asio.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <string.h>
+
+#ifdef __GNUC__
+#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+#define GETCHAR_PROTOTYPE int __io_getchar(void)
+#else
+#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
+#define GETCHAR_PROTOTYPE int fgetc(FILE *f)
+#endif
+
+UART_HandleTypeDef *asIoPort = NULL;
+UART_HandleTypeDef *asDbgPort = NULL;
+//char* _NL = "\r\n"; //CR LF podle dálnopisu
+
+PUTCHAR_PROTOTYPE
+{
+  HAL_UART_Transmit(asIoPort, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+  return ch;
+}
+
+GETCHAR_PROTOTYPE
+{
+  uint8_t ch = 0;
+
+  /* Clear the Overrun flag just before receiving the first character */
+  __HAL_UART_CLEAR_OREFLAG(asIoPort);
+
+  /* Wait for reception of a character on the USART RX line and echo this
+   * character on console */
+  HAL_UART_Receive(asIoPort, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+  HAL_UART_Transmit(asIoPort, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+  return ch;
+}
+
+//static char dbgBuffer[1024];
+
+// ladící výstup
+int asDebug(const char *fmt, ...) {
+	if(asDbgPort == NULL)
+		return 0;
+
+	int16_t bufSize = 1024*sizeof(char);
+	char *dbgBuffer = (char *)malloc(bufSize);
+	va_list args;
+	va_start(args, fmt);
+	*dbgBuffer = '\0';
+	int rc = vsnprintf(dbgBuffer, bufSize, fmt, args);
+	va_end(args);
+//	CDC_Transmit_HS(dbgBuffer, strlen(dbgBuffer));
+	HAL_UART_Transmit(asDbgPort, (uint8_t*) dbgBuffer, strlen(dbgBuffer), 100);
+	free( asDbgPort );
+	return rc;
+}
+
+int asDebugNL(const char *fmt, ...) {
+	if(asDbgPort == NULL)
+		return 0;
+
+	int16_t bufSize = 1024*sizeof(char);
+	char *dbgBuffer = (char *)malloc(bufSize);
+	va_list args;
+	va_start(args, fmt);
+	*dbgBuffer = '\0';
+	int rc = vsnprintf(dbgBuffer, bufSize, fmt, args);
+	va_end(args);
+	strcat((char*) dbgBuffer, _NL);
+//	CDC_Transmit_HS(dbgBuffer, strlen(dbgBuffer));
+	HAL_UART_Transmit(asDbgPort, (uint8_t*) dbgBuffer, strlen(dbgBuffer), 100);
+	free( asDbgPort );
+	return rc;
+}

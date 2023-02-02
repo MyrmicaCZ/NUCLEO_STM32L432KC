@@ -1,0 +1,24 @@
+/*
+ * asio.h
+ *
+ *  Created on: 18. 1. 2023
+ *      Author: tonda
+ */
+
+#ifndef INC_ASIO_H_
+#define INC_ASIO_H_
+
+#include "main.h"
+
+#define _NL   "\r\n"
+
+extern UART_HandleTypeDef *asIoPort;
+extern UART_HandleTypeDef *asDbgPort;
+//extern char* _NL;
+
+int asDebug(const char *fmt, ...);
+int asDebugNL(const char *fmt, ...);
+
+
+
+#endif /* INC_ASIO_H_ */
