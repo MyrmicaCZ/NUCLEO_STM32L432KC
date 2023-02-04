@@ -63,10 +63,10 @@ void Error_Handler(void);
 #define VCP_TX_GPIO_Port GPIOA
 #define SIM_Pin GPIO_PIN_8
 #define SIM_GPIO_Port GPIOA
-#define DBG_TX_Pin GPIO_PIN_9
-#define DBG_TX_GPIO_Port GPIOA
-#define DBG_RX_Pin GPIO_PIN_10
-#define DBG_RX_GPIO_Port GPIOA
+#define ESP32_TX_Pin GPIO_PIN_9
+#define ESP32_TX_GPIO_Port GPIOA
+#define ESP32_RX_Pin GPIO_PIN_10
+#define ESP32_RX_GPIO_Port GPIOA
 #define BTN1_Pin GPIO_PIN_11
 #define BTN1_GPIO_Port GPIOA
 #define SWDIO_Pin GPIO_PIN_13
@@ -79,10 +79,6 @@ void Error_Handler(void);
 #define LD3_GPIO_Port GPIOB
 #define LDE1_Pin GPIO_PIN_4
 #define LDE1_GPIO_Port GPIOB
-#define BMP_SCL_Pin GPIO_PIN_6
-#define BMP_SCL_GPIO_Port GPIOB
-#define BMP_SDA_Pin GPIO_PIN_7
-#define BMP_SDA_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
